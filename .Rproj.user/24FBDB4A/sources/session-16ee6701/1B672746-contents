@@ -1,0 +1,130 @@
+---
+title: "biostat4project"
+output: html_document
+date: "2024-04-23"
+---
+
+```{r}
+library(survey)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+da35067.0001 <- read.csv("/Users/xintong/Desktop/statistical overflow/project1 - R/35067-0001-Data.csv")
+
+d1 <- da35067.0001 %>%
+  select(AGE, EDUCAT, EMPCAT, INC_CAT, NSD1E, RESPID, CASEWGT, STR, SECU, I_ALD30) %>%
+  drop_na() %>%
+  rename(Frequency = NSD1E, Age = AGE, Education = EDUCAT, Employment = EMPCAT, Income = INC_CAT, I_ALD30 = )
+head(d1,10)
+
+
+d1w <- svydesign(id = ~RESPID, weights = ~CASEWGT, strata = ~STR, nest = TRUE, cluster = ~SECU, data = d1)
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(d1, aes(x = Frequency, y = Age)) +
+  geom_boxplot(alpha = 0.5, width = 0.2) +  
+  geom_violin(trim = FALSE, fill = "skyblue", alpha = 0.5) + 
+  labs(
+    title = "Mean Age by Frequency of Feeling Sad",
+    x = "Frequency of Feeling Sad",
+    y = "Age"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+edu <- as.data.frame(svytable(~Education + Frequency, design = d1w))
+emp <- as.data.frame(svytable(~Employment + Frequency, design = d1w))
+inc <- as.data.frame(svytable(~Income + Frequency, design = d1w))
+
+ggplot(edu, aes(x = Frequency, y = Freq, fill = Frequency)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ Education, scales = "free_y") +
+  labs(
+    title = "Survey-Weighted Counts by Years of Education",
+    x = "Frequency of Feeling Sad",
+    y = "Count of People",
+    fill = "Frequency"
+  ) +
+  theme_minimal()
+
+ggplot(emp, aes(x = Frequency, y = Freq, fill = Frequency)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ Employment, scales = "free_y") +  
+  labs(
+    title = "Survey-Weighted Counts by Employment",
+    x = "Frequency of Feeling Sad",
+    y = "Count of People",
+    fill = "Frequency"
+  ) +
+  theme_minimal()
+
+ggplot(inc, aes(x = Frequency, y = Freq, fill = Frequency)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ Income, scales = "free_y") + 
+  labs(
+    title = "Survey-Weighted Counts by Income Levels",
+    x = "Frequency of Feeling Sad",
+    y = "Count of People",
+    fill = "Frequency"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+# Relevel Frequency with "never" as the reference group
+levels(d1w$variables$Frequency)
+levels(d1w$variables$I_ALD30)
+distinct_values <- data.frame(d1w$variables$I_ALD30) %>% 
+  distinct()
+print(distinct_values$d1w.variables.I_ALD30)
+
+d1w$Frequency <- relevel(d1w$variables$Frequency, ref = "(4) Never")
+d1w$variables$I_ALD30 <- relevel(d1w$variables$I_ALD30, ref = "(5) Not Endorsed")
+
+a1 <- svyglm(I_ALD30 ~ Frequency, family = binomial(link = "logit"), design = d1w)
+summary(a1)
+exp(coef(a1))
+ci <- confint(a1)
+exp(ci)
+
+a2 <- svyglm (I_ALD30 ~ NSD1E + AGE, family = binomial(link = "logit"), design = d1w)
+summary(a2)
+
+# final model
+a3 <- svyglm (I_ALD30 ~ NSD1E + AGE + EDUCAT, family = binomial(link = "logit"), design = d1w)
+summary(a3)
+exp(coef(a3))
+ci1 <- confint(a3)
+exp(ci1)
+
+library(car)
+vif(a3)
+
+a4 <- svyglm (I_ALD30 ~ NSD1E + AGE + EDUCAT + EMPCAT, family = binomial(link = "logit"), design = d1w)
+summary(a4)
+
+a5 <- svyglm (I_ALD30 ~ NSD1E + AGE + EDUCAT + INC_CAT, family = binomial(link = "logit"), design = d1w)
+summary(a5)
+
+a6 <- svyglm (I_ALD30 ~ NSD1E + AGE + EDUCAT + EMPCAT + INC_CAT, family = binomial(link = "logit"), design = d1w)
+summary(a6)
+vif(a6)
+```
+
+Functions from dplyr package
+select()
+distinct()
+rename()
+dplyr()
+Functions from tidyr package
+drop_na()
+Functions from ggplot2 package
+geom_boxplot()
+geom_violin()
+geom_col
