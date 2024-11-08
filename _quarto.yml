@@ -18,3 +18,9 @@ format:
 
 editor: visual
 
+publish:
+  gh-pages:
+    url: "https://github.com/xli000/biostat777-intro-Xintong-Li"
+    branch: gh-pages 
+    dir: _site
+
