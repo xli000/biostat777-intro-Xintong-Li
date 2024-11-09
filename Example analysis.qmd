@@ -1,0 +1,192 @@
+---
+title: "Example analysis"
+format: html 
+bibliography: references.bib
+nocite: |
+  @*
+---
+## Feeling sad and incident alcohol dependence
+![](alcohol.png)
+
+## Aim 
+<p style="text-indent: 2em;">
+This analysis aims to explore the association between the frequency of feeling sad and incident alcohol dependence.
+</p>
+
+::: {.column-margin}
+Incidental alcohol dependence refers to alcohol dependence during the past 30 days.
+:::
+
+## Intended Audience
+<p style="text-indent: 2em;">
+The intended audience for this analysis includes researchers specializing in mental health, alcohol abuse, and related fields, mental health practitioners, and people who have concerns about mental health and alcohol abuse issues.
+</p>
+
+## Data Source
+<p style="text-indent: 2em;">
+All data was sourced from The National Comorbidity Survey: Reinterview (NCS-2), 2001-2002 (ICPSR 35067). The NCS-2 survey was follow-up interviews with 5,001 individuals who had participated in the NCS-1 baseline survey a decade ago. Carried out via computer-assisted personal interviews, the NCS-2 survey targeted the noninstitutionalized civilian population aged 25 to 69 across the 48 contiguous United States. The purpose of this longitudinal survey, including NCS-1 and 2, was to track changes in mental disorders, substance use disorders, predictors of changes, and consequences over the ten-year period. Demographic and background information collected include age, education, employment, household composition, household income, marital status, and region. Data dictionary and more information can be accessed from [NCS-2 survey](https://www.icpsr.umich.edu/web/ICPSR/studies/35067/summary).
+</p>
+
+## Exploratory Data Analysis
+## Data Wrangling
+<p style="text-indent: 2em;">
+The svydesign was used to account for survey design features of the data. 
+</p>
+```{r}
+#| message: false
+#| warning: false
+library(survey)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(forcats)
+library(car)
+
+load("35067-0001-Data.rda")
+
+d1 <- da35067.0001 %>%
+  select(AGE, EDUCAT, EMPCAT, INC_CAT, NSD1E, RESPID, CASEWGT, STR, SECU, I_ALD30) %>%
+  drop_na() %>%
+  rename(Frequency = NSD1E, Age = AGE, Education = EDUCAT, Employment = EMPCAT, Income = INC_CAT)
+
+d1w <- svydesign(id = ~RESPID, weights = ~CASEWGT, strata = ~STR, nest = TRUE, cluster = ~SECU, data = d1)
+```
+## Demographic Variable Distribution
+<p style="text-indent: 2em;">
+The average age of our study population is 43 years (SD = 2.6). The average age across the different categories of the primary covariate is comparable.
+</p>
+```{r}
+library(ggplot2)
+
+ggplot(d1, aes(x = Frequency, y = Age)) +
+  geom_boxplot(alpha = 0.5, width = 0.2) +  
+  geom_violin(trim = FALSE, fill = "skyblue", alpha = 0.5) + 
+  labs(
+    title = "Mean Age by Frequency of Feeling Sad",
+    x = "Frequency of Feeling Sad",
+    y = "Age"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+<p style="text-indent: 2em;">
+Only 13% of participants have completed 0–11 years of education, while approximately 30% of participants fall into each of the other education levels.
+</p>
+```{r}
+edu <- as.data.frame(svytable(~Education + Frequency, design = d1w))
+
+ggplot(edu, aes(x = Frequency, y = Freq, fill = Frequency)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ Education, scales = "free_y") +
+  labs(
+    title = "Survey-Weighted Count of People by Years of Education",
+    x = "Frequency of Feeling Sad",
+    y = "Count of People",
+    fill = "Frequency"
+  ) +
+  theme_minimal() +
+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+<p style="text-indent: 2em;">
+The majority of participants (82%) are working. 
+</p>
+```{r}
+emp <- as.data.frame(svytable(~Employment + Frequency, design = d1w))
+ggplot(emp, aes(x = Frequency, y = Freq, fill = Frequency)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ Employment, scales = "free_y") +  
+  labs(
+    title = "Survey-Weighted Count of People by Employment",
+    x = "Frequency of Feeling Sad",
+    y = "Count of People",
+    fill = "Frequency"
+  ) +
+  theme_minimal() +
+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+<p style="text-indent: 2em;">
+More participants are in the middle two per capita income categories (28% in $12,875 - $25,749 and 31% in $25,750 - $51,499), while fewer participants are in the lowest and highest categories (21% in < $12,875 and 19% in $51,500 or More). 
+</p>
+```{r}
+inc <- as.data.frame(svytable(~Income + Frequency, design = d1w))
+ggplot(inc, aes(x = Frequency, y = Freq, fill = Frequency)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ Income, scales = "free_y", labeller = label_wrap_gen(width = 25)) + 
+  labs(
+    title = "Survey-Weighted Count of People by Income Levels",
+    x = "Frequency of Feeling Sad",
+    y = "Count of People",
+    fill = "Frequency"
+  ) +
+  theme_minimal() +
+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Modeling
+```{r}
+# Relevel Frequency with "never" as the reference group
+d1w$variables <- d1w$variables %>%
+  mutate(
+    Frequency = fct_relevel(Frequency, "(4) Never"),  
+    I_ALD30 = fct_relevel(I_ALD30, "(5) Not Endorsed")
+    )
+```
+
+```{r}
+#| warning: false
+a1 <- svyglm(I_ALD30 ~ Frequency, family = binomial(link = "logit"), design = d1w)
+summary(a1)
+exp(coef(a1))
+ci <- confint(a1)
+exp(ci)
+
+a2 <- svyglm (I_ALD30 ~ Frequency + Age, family = binomial(link = "logit"), design = d1w)
+summary(a2)
+
+# final model
+a3 <- svyglm (I_ALD30 ~ Frequency + Age + Education, family = binomial(link = "logit"), design = d1w)
+summary(a3)
+exp(coef(a3))
+ci1 <- confint(a3)
+exp(ci1)
+vif(a3)
+
+a4 <- svyglm (I_ALD30 ~ Frequency + Age + Education + Employment, family = binomial(link = "logit"), design = d1w)
+summary(a4)
+
+a5 <- svyglm (I_ALD30 ~ Frequency + Age + Education + Income, family = binomial(link = "logit"), design = d1w)
+summary(a5)
+
+a6 <- svyglm (I_ALD30 ~ Frequency + Age + Education + Income + Employment, family = binomial(link = "logit"), design = d1w)
+summary(a6)
+vif(a6)
+```
+
+::: {.callout-note collapse="true"}
+### Functions from the `dplyr` Package
+
+-   `select()`
+-   `distinct()`
+-   `rename()`
+-   `mutate()`
+:::
+::: {.callout-note collapse="true"}
+### Functions from the `tidyr` Package
+
+-   `drop_na()`
+:::
+::: {.callout-note collapse="true"}
+### Functions from the `ggplot2` Package
+
+-   `geom_boxplot()`
+-   `geom_violin()`
+-   `geom_col()`
+:::
+
+## Results
+<p style="text-indent: 2em;">
+In the crude model, the odds of developing incident alcohol dependence are significantly lower among people who sometimes (OR: 0.251, 95% CI: 0.102 - 0.617), rarely (OR: 0.145, 95% CI: 0.0458 - 0.459), and never (OR: 0.0319, 95% CI: 0.00769, 0.133) feel sad compared to those who often feel sad (reference group: OR = 1). After adjusting for potential confounders, the odds of incident alcohol dependence slightly increase among people who sometimes (OR: 0.266, 95% CI: 0.103 - 0.685), rarely (OR: 0.160, 95% CI: 0.0433 - 0.590,) and never (OR: 0.0341, 95% CI: 0.00806, 0.144) feel sad, but the odds are still significantly lower compared to those who often feel sad (reference group: OR = 1). These findings indicate that a higher frequency of sad feelings is associated with higher odds of incident alcohol dependence.
+</p>
+## References
+::: {#refs}
+:::

@@ -1,0 +1,14 @@
+---
+title: "Xintong Li"
+format: html 
+---
+
+My name is Xintong Li. I'm a MSPH student with a concentration in GDEC. In my free time, I enjoy cuddling with my cat.
+
+<figure>
+
+<img src="cat.jpg" alt="Let&apos;s kiss Peach" width="600px"/>
+
+<figcaption>Let's kiss Peach</figcaption>
+
+</figure>
