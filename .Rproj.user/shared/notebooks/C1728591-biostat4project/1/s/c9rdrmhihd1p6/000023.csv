@@ -1,3 +1,0 @@
-"0",""
-"0",""
-"0","d1w <- svydesign(id = ~RESPID, weights = ~CASEWGT, strata = ~STR, nest = TRUE, cluster = ~SECU, data = d1)"
